@@ -209,6 +209,27 @@ See [`UDP_Frame_Format_Documentation.md`](UDP_Frame_Format_Documentation.md) for
 - **Check network bandwidth**: Monitor with `iftop` or similar
 - **Optimize scene**: Reduce motion/complexity in camera view
 
+## ✅ Testing
+
+### Option A: Virtual Environment (recommended on Raspberry Pi)
+```bash
+sudo apt-get update
+sudo apt-get install -y python3-venv python3-full
+
+python3 -m venv .venv
+source .venv/bin/activate
+
+pip install -r requirements.txt
+pytest -q
+```
+
+### Option B: System package
+```bash
+sudo apt-get update
+sudo apt-get install -y python3-pytest
+pytest -q
+```
+
 ## 🤝 Contributing
 
 1. Fork the repository

@@ -22,6 +22,7 @@ opencv-python>=4.8.0
 # http.server - built-in
 
 # Optional: For development and testing
+pytest>=7.4.0
 # numpy>=1.24.0  # Usually comes with opencv-python
 # pillow>=9.0.0  # For additional image format support
 
