@@ -55,7 +55,7 @@ sudo raspi-config
 
 ### Server (Raspberry Pi)
 
-Run the streaming server:
+Run the streaming server (uses `config/config.json` by default):
 ```bash
 python3 streamer.py
 ```
@@ -64,6 +64,35 @@ Choose your streaming method:
 - **1**: UDP Streaming (recommended for internet)
 - **2**: TCP Streaming (reliable, local network)
 - **3**: HTTP/MJPEG (web browser compatible)
+
+### Configure Capture Settings
+
+You can configure resolution and FPS using either JSON config or CLI flags.
+
+#### Default JSON config
+Edit `config/config.json`:
+```json
+{
+  "width": 1280,
+  "height": 720,
+  "fps": 30
+}
+```
+
+#### Use a custom JSON file
+```bash
+python3 streamer.py --config /path/to/config.json
+```
+
+#### Override via CLI (highest priority)
+```bash
+python3 streamer.py --width 1920 --height 1080 --fps 25
+```
+
+#### Priority order
+1. CLI flags
+2. JSON config (if present)
+3. Defaults (640x480 @ 30 FPS)
 
 ### Client Examples
 
@@ -146,10 +175,7 @@ Simply navigate to: `http://raspberry_pi_ip:8080`
 ## 🔧 Configuration
 
 ### Camera Settings
-Edit `streamer.py` to modify:
-```python
-VideoStreamer(resolution=(640, 480), framerate=30)
-```
+Use `config/config.json` or CLI flags (`--width`, `--height`, `--fps`). The default config file is loaded automatically unless overridden with `--config`.
 
 ### JPEG Quality
 Adjust compression quality (1-100):
