@@ -4,6 +4,7 @@ Video capture and network streaming for Raspberry Pi 5
 Supports multiple streaming methods: UDP, TCP, HTTP streaming
 """
 
+import argparse
 import cv2
 import socket
 import struct
@@ -432,6 +433,15 @@ class HTTPVideoStreamer(VideoStreamer):
 
 # Example usage
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Raspberry Pi camera streaming server")
+    parser.add_argument("--width", type=int, default=640, help="Video width in pixels")
+    parser.add_argument("--height", type=int, default=480, help="Video height in pixels")
+    parser.add_argument("--fps", type=int, default=30, help="Frames per second")
+    args = parser.parse_args()
+
+    if args.width <= 0 or args.height <= 0 or args.fps <= 0:
+        raise ValueError("width, height, and fps must be positive integers")
+
     print("Choose streaming method:")
     print("1. UDP Streaming (fast, unreliable)")
     print("2. TCP Streaming (reliable, slower)")
@@ -441,13 +451,28 @@ if __name__ == "__main__":
     
     try:
         if choice == "1":
-            streamer = UDPVideoStreamer(host='0.0.0.0', port=9999)
+            streamer = UDPVideoStreamer(
+                host='0.0.0.0',
+                port=9999,
+                resolution=(args.width, args.height),
+                framerate=args.fps,
+            )
             streamer.start_streaming()
         elif choice == "2":
-            streamer = TCPVideoStreamer(host='0.0.0.0', port=8888)
+            streamer = TCPVideoStreamer(
+                host='0.0.0.0',
+                port=8888,
+                resolution=(args.width, args.height),
+                framerate=args.fps,
+            )
             streamer.start_server()
         elif choice == "3":
-            streamer = HTTPVideoStreamer(host='0.0.0.0', port=8080)
+            streamer = HTTPVideoStreamer(
+                host='0.0.0.0',
+                port=8080,
+                resolution=(args.width, args.height),
+                framerate=args.fps,
+            )
             streamer.start_server()
         else:
             print("Invalid choice")
