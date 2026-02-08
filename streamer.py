@@ -20,6 +20,7 @@ import io
 import socketserver
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from config import parse_stream_config
+from packetization import build_frame_packets
 
 LOGGER = logging.getLogger("streamer")
 
@@ -316,25 +317,9 @@ class UDPVideoStreamer(VideoStreamer):
         - FRAME_START + [frame_id:uint32][frame_size:uint32][chunk_count:uint32]
         - CHUNK + [frame_id:uint32][chunk_index:uint32] + chunk_payload (<= chunk_payload_size)
         """
-        size = len(data)
         payload_size = self.chunk_payload_size
-        if payload_size <= 0:
-            payload_size = 1200
-
-        # Compute chunk count
-        chunk_count = (size + payload_size - 1) // payload_size
-
-        # Send frame start header
-        frame_header = struct.pack("LLL", frame_id, size, chunk_count)
-        self.socket.sendto(b"FRAME_START" + frame_header, client_addr)
-
-        # Send chunk packets
-        chunk_index = 0
-        for offset in range(0, size, payload_size):
-            chunk = data[offset:offset + payload_size]
-            chunk_header = struct.pack("LL", frame_id, chunk_index)
-            self.socket.sendto(b"CHUNK" + chunk_header + chunk, client_addr)
-            chunk_index += 1
+        for packet in build_frame_packets(data, frame_id, payload_size):
+            self.socket.sendto(packet, client_addr)
     
     def cleanup_inactive_clients(self):
         """Remove clients that haven't sent keepalive messages"""
