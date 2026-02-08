@@ -5,6 +5,8 @@ Supports multiple streaming methods: UDP, TCP, HTTP streaming
 """
 
 import cv2
+import logging
+import os
 import socket
 import struct
 import pickle
@@ -17,6 +19,21 @@ import io
 import socketserver
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from config import parse_stream_config
+
+LOGGER = logging.getLogger("streamer")
+
+
+def configure_logging(log_path: str = "logs/streamer.log") -> None:
+    if LOGGER.handlers:
+        return
+    log_dir = os.path.dirname(log_path)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+    handler = logging.FileHandler(log_path)
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+    handler.setFormatter(formatter)
+    LOGGER.addHandler(handler)
+    LOGGER.setLevel(logging.INFO)
 
 class VideoStreamer:
     def __init__(
@@ -40,6 +57,12 @@ class VideoStreamer:
             bitrate=bitrate,
             profile=profile,
             intra_period=gop,
+        )
+        LOGGER.info(
+            "Encoder config: bitrate=%s gop=%s profile=%s",
+            bitrate,
+            gop,
+            profile,
         )
         
         self.resolution = resolution
@@ -450,6 +473,7 @@ class HTTPVideoStreamer(VideoStreamer):
 
 # Example usage
 if __name__ == "__main__":
+    configure_logging()
     config = parse_stream_config()
 
     print("Choose streaming method:")

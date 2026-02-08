@@ -194,6 +194,9 @@ Adjust compression quality (1-100):
 cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
 ```
 
+### Logs
+Encoder settings are written to `logs/streamer.log` with timestamps at startup.
+
 ### UDP Chunk Size
 Modify chunk payload size:
 ```python
