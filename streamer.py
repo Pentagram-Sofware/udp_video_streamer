@@ -111,25 +111,35 @@ class VideoStreamer:
         if self.h264_output is not None:
             return
         # Begin recording; encoded H.264 bytes are written into H264BufferOutput.
-        self.h264_output = H264BufferOutput()
-        self.picam2.start_recording(self.h264_encoder, FileOutput(self.h264_output))
+        output = H264BufferOutput()
+        try:
+            self.picam2.start_recording(self.h264_encoder, FileOutput(output))
+        except Exception:
+            # Ensure we don't leave a stale output that blocks retries.
+            output.clear()
+            raise
+        self.h264_output = output
 
     def stop_h264_output(self) -> None:
         """Stop H.264 encoder output and clear buffered data."""
         if self.h264_output is None:
             return
         # Stop recording and drop any queued bytes.
-        self.picam2.stop_recording()
-        self.h264_output.clear()
-        self.h264_output = None
+        try:
+            self.picam2.stop_recording()
+        finally:
+            self.h264_output.clear()
+            self.h264_output = None
 
 class UDPVideoStreamer(VideoStreamer):
     """Stream video over UDP (fast but no reliability guarantee)"""
     
-    def __init__(self, host='0.0.0.0', port=9999, **kwargs):
+    def __init__(self, host='0.0.0.0', port=9999, use_h264=False, **kwargs):
         super().__init__(**kwargs)
         self.host = host
         self.port = port
+        # When True, stream H.264 encoder output instead of JPEG frames.
+        self.use_h264 = use_h264
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind((self.host, self.port))
@@ -156,7 +166,8 @@ class UDPVideoStreamer(VideoStreamer):
         listener_thread.start()
         
         # Start streaming thread (will only stream when clients are connected)
-        streaming_thread = threading.Thread(target=self.stream_to_clients)
+        stream_target = self.stream_h264_to_clients if self.use_h264 else self.stream_to_clients
+        streaming_thread = threading.Thread(target=stream_target)
         streaming_thread.daemon = True
         streaming_thread.start()
         
@@ -261,6 +272,42 @@ class UDPVideoStreamer(VideoStreamer):
             except Exception as e:
                 print(f"UDP streaming error: {e}")
                 break
+
+    def stream_h264_to_clients(self):
+        """Stream H.264 encoder output to registered clients."""
+        # Start H.264 output; bytes are buffered by H264BufferOutput.
+        self.start_h264_output()
+        try:
+            while self.running:
+                if not self.clients:
+                    # No clients connected, wait
+                    time.sleep(0.1)
+                    continue
+
+                chunk = self.h264_output.get_chunk() if self.h264_output else None
+                if not chunk:
+                    time.sleep(0.005)
+                    continue
+
+                # Treat each encoder chunk as a payload to packetize and send.
+                disconnected_clients = []
+                frame_id = self.next_frame_id
+                for client_addr in list(self.clients.keys()):
+                    try:
+                        self.send_frame_to_client(chunk, client_addr, frame_id)
+                    except Exception as e:
+                        print(f"Error sending to client {client_addr}: {e}")
+                        disconnected_clients.append(client_addr)
+
+                for client_addr in disconnected_clients:
+                    if client_addr in self.clients:
+                        del self.clients[client_addr]
+                        print(f"Removed unresponsive client: {client_addr}")
+
+                self.next_frame_id = (self.next_frame_id + 1) & 0xFFFFFFFF
+        finally:
+            # Ensure we stop the encoder output when streaming ends.
+            self.stop_h264_output()
     
     def send_frame_to_client(self, data, client_addr, frame_id):
         """Send a frame to a specific client using small UDP chunks to avoid fragmentation.
