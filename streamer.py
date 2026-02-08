@@ -19,7 +19,14 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from config import parse_stream_config
 
 class VideoStreamer:
-    def __init__(self, resolution=(640, 480), framerate=30):
+    def __init__(
+        self,
+        resolution=(640, 480),
+        framerate=30,
+        bitrate=2_000_000,
+        gop=30,
+        profile="baseline",
+    ):
         # Initialize camera
         self.picam2 = Picamera2()
         config = self.picam2.create_video_configuration(
@@ -27,9 +34,19 @@ class VideoStreamer:
         )
         self.picam2.configure(config)
         self.picam2.start()
+
+        # Configure H.264 encoder (for future H.264-based pipelines)
+        self.h264_encoder = H264Encoder(
+            bitrate=bitrate,
+            profile=profile,
+            intra_period=gop,
+        )
         
         self.resolution = resolution
         self.framerate = framerate
+        self.bitrate = bitrate
+        self.gop = gop
+        self.profile = profile
         self.running = False
         
     def capture_frame(self):
@@ -449,6 +466,9 @@ if __name__ == "__main__":
                 port=9999,
                 resolution=config.resolution,
                 framerate=config.fps,
+                bitrate=config.bitrate,
+                gop=config.gop,
+                profile=config.profile,
             )
             streamer.start_streaming()
         elif choice == "2":
@@ -457,6 +477,9 @@ if __name__ == "__main__":
                 port=8888,
                 resolution=config.resolution,
                 framerate=config.fps,
+                bitrate=config.bitrate,
+                gop=config.gop,
+                profile=config.profile,
             )
             streamer.start_server()
         elif choice == "3":
@@ -465,6 +488,9 @@ if __name__ == "__main__":
                 port=8080,
                 resolution=config.resolution,
                 framerate=config.fps,
+                bitrate=config.bitrate,
+                gop=config.gop,
+                profile=config.profile,
             )
             streamer.start_server()
         else:

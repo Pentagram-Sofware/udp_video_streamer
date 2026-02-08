@@ -67,7 +67,7 @@ Choose your streaming method:
 
 ### Configure Capture Settings
 
-You can configure resolution and FPS using either JSON config or CLI flags.
+You can configure capture and encoder settings using either JSON config or CLI flags.
 
 #### Default JSON config
 Edit `config/config.json`:
@@ -75,7 +75,10 @@ Edit `config/config.json`:
 {
   "width": 1280,
   "height": 720,
-  "fps": 30
+  "fps": 30,
+  "bitrate": 2000000,
+  "gop": 30,
+  "profile": "baseline"
 }
 ```
 
@@ -86,13 +89,21 @@ python3 streamer.py --config /path/to/config.json
 
 #### Override via CLI (highest priority)
 ```bash
-python3 streamer.py --width 1920 --height 1080 --fps 25
+python3 streamer.py --width 1920 --height 1080 --fps 25 --bitrate 3000000 --gop 60 --profile main
 ```
 
 #### Priority order
 1. CLI flags
 2. JSON config (if present)
 3. Defaults (640x480 @ 30 FPS)
+
+#### Argument reference
+- `--width`: Video width in pixels (default: 640)
+- `--height`: Video height in pixels (default: 480)
+- `--fps`: Frames per second (default: 30)
+- `--bitrate`: H.264 target bitrate in bits/sec (default: 2_000_000)
+- `--gop`: H.264 GOP / keyframe interval in frames (default: 30)
+- `--profile`: H.264 profile (`baseline`, `main`, `high`) (default: `baseline`)
 
 ### Client Examples
 
