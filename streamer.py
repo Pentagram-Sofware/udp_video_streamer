@@ -5,6 +5,7 @@ Supports multiple streaming methods: UDP, TCP, HTTP streaming
 """
 
 import cv2
+from collections import deque
 import logging
 import os
 import socket
@@ -35,6 +36,33 @@ def configure_logging(log_path: str = "logs/streamer.log") -> None:
     LOGGER.addHandler(handler)
     LOGGER.setLevel(logging.INFO)
 
+
+class H264BufferOutput:
+    """Collect H.264 encoder output into a byte queue for streaming."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._chunks: deque[bytes] = deque()
+
+    def write(self, data: bytes) -> int:
+        if not data:
+            return 0
+        # The encoder writes arbitrary-sized H.264 chunks; store them for later
+        # packetization by the UDP sender.
+        with self._lock:
+            self._chunks.append(bytes(data))
+        return len(data)
+
+    def get_chunk(self) -> bytes | None:
+        with self._lock:
+            if not self._chunks:
+                return None
+            return self._chunks.popleft()
+
+    def clear(self) -> None:
+        with self._lock:
+            self._chunks.clear()
+
 class VideoStreamer:
     def __init__(
         self,
@@ -52,12 +80,13 @@ class VideoStreamer:
         self.picam2.configure(config)
         self.picam2.start()
 
-        # Configure H.264 encoder (for future H.264-based pipelines)
+        # Configure H.264 encoder (initialized now; actual recording starts later)
         self.h264_encoder = H264Encoder(
             bitrate=bitrate,
             profile=profile,
             intra_period=gop,
         )
+        self.h264_output = None
         LOGGER.info(
             "Encoder config: bitrate=%s gop=%s profile=%s",
             bitrate,
@@ -76,6 +105,23 @@ class VideoStreamer:
         """Capture a single frame from camera"""
         frame = self.picam2.capture_array()
         return cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+    def start_h264_output(self) -> None:
+        """Start H.264 encoder output into an in-memory buffer."""
+        if self.h264_output is not None:
+            return
+        # Begin recording; encoded H.264 bytes are written into H264BufferOutput.
+        self.h264_output = H264BufferOutput()
+        self.picam2.start_recording(self.h264_encoder, FileOutput(self.h264_output))
+
+    def stop_h264_output(self) -> None:
+        """Stop H.264 encoder output and clear buffered data."""
+        if self.h264_output is None:
+            return
+        # Stop recording and drop any queued bytes.
+        self.picam2.stop_recording()
+        self.h264_output.clear()
+        self.h264_output = None
 
 class UDPVideoStreamer(VideoStreamer):
     """Stream video over UDP (fast but no reliability guarantee)"""
